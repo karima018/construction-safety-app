@@ -146,7 +146,11 @@ if app_mode == "📁 Upload Image" and model_status:
                         
                         st.error(f"❌ **ACCESS DENIED (NOT ALLOWED)** — Safety Violation Detected! Missing: {', '.join(violation_text)}.")
                         st.warning("⚠️ **ALERT:** Immediate disciplinary action or supervisor check required for this worker.")
+# Purono code:
+# app_mode = st.sidebar.selectbox("Choose Input Mode", ["📁 Upload Image"])
 
+# Notun code (ebaabe dao):
+app_mode = st.sidebar.selectbox("Choose Input Mode", ["📁 Upload Image", "📷 Webcam Live Photo"])
         except Exception as e:
             st.error(f"Error processing image: {e}")
 
