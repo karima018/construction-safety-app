@@ -26,3 +26,9 @@ except Exception as e:
 # Rest of your Streamlit application UI code goes here...
 st.markdown("<h1 style='text-align: center; color: #ff4b4b;'>🛡️ Real-Time Construction Safety Detection</h1>", unsafe_allow_html=True)
 st.write("Upload an image or video to detect safety gear compliance.")
+# File uploader option
+uploaded_file = st.file_uploader("Choose an image or video...", type=["jpg", "jpeg", "png", "mp4"])
+
+if uploaded_file is not None:
+    st.write("File uploaded successfully! Processing...")
+    # Ekhane prediction ba detection-er baki code thakbe
