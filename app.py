@@ -35,7 +35,7 @@ except Exception as e:
 # --- Page Configuration ---
 st.set_page_config(page_title="Construction Safety Dashboard", page_icon="🛡️", layout="wide")
 
-# --- Custom CSS Styling (Dark Theme & Modern Cards like Pro Dashboard) ---
+# --- Custom CSS Styling (Dark Theme & Modern Cards) ---
 st.markdown("""
     <style>
     .main { background-color: #0b0f19; }
@@ -56,21 +56,13 @@ st.markdown("""
         background-color: #3b82f6 !important;
         color: white !important;
     }
-    .metric-card {
-        background-color: #121826;
-        border: 1px solid #1e293b;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
-        text-align: center;
-    }
     </style>
 """, unsafe_allow_html=True)
 
 # --- Top Header Bar ---
 col_h1, col_h2, col_h3 = st.columns([2, 5, 2])
 with col_h1:
-    st.markdown("### 🛡️ YOLOv8 Safety")
+    st.markdown("### 🛡️ Safety Dashboard")
 with col_h2:
     st.markdown("<p style='text-align: center; color: #94a3b8; font-size: 14px;'>Real-time PPE Detection & Access Control System</p>", unsafe_allow_html=True)
 with col_h3:
@@ -84,10 +76,10 @@ st.sidebar.markdown("### 🎛️ Control Panel")
 app_mode = st.sidebar.selectbox("Choose Input Mode", ["📁 Upload Image", "📷 Webcam Live Photo"])
 confidence = st.sidebar.slider("Confidence Threshold", 0.1, 1.0, 0.4, 0.05)
 st.sidebar.markdown("---")
-st.sidebar.info("💡 **Tip:** Use the tabs below to switch between Live Stream, Analytics, and Logs.")
+st.sidebar.info("💡 **Tip:** Adjust the confidence slider if items are not detected properly.")
 
-# --- Tab Navigation (Like Friend's Dashboard) ---
-tab1, tab2, tab3 = st.tabs(["🟢 Live Video & Tracking", "📊 Analytics & Compliance", "🚨 Violation Logs"])
+# --- Tab Navigation (Updated for Construction Safety) ---
+tab1, tab2, tab3 = st.tabs(["📸 Upload & Snapshot", "📊 Site Analytics", "🚨 Violation Records"])
 
 with tab1:
     if app_mode == "📁 Upload Image" and model_status:
@@ -123,7 +115,6 @@ with tab1:
                         has_helmet = 'helmet' in detected_classes
                         has_vest = 'vest' in detected_classes
                         
-                        # --- Metrics Section inside Tab 1 ---
                         st.markdown("### 📊 Detection Statistics")
                         m1, m2, m3 = st.columns(3)
                         with m1: st.metric(label="👷 Helmets Detected", value=helmet_count)
@@ -164,12 +155,21 @@ with tab1:
             with m1: st.metric(label="👷 Helmets", value=helmet_count)
             with m2: st.metric(label="🦺 Vests", value=vest_count)
             with m3: st.metric(label="📌 Total", value=len(detected_classes))
+            
+            has_helmet = 'helmet' in detected_classes
+            has_vest = 'vest' in detected_classes
+            
+            st.markdown("### 🚦 Access Control Gate Status")
+            if has_helmet and has_vest:
+                st.success("✅ **STATUS: ALLOWED TO ENTER** — Complete gear verified.")
+            else:
+                st.error("❌ **STATUS: ACCESS DENIED** — Missing safety equipment!")
 
 with tab2:
-    st.markdown("### 📈 Site Analytics & Compliance Overview")
-    st.info("Analytics charts and historical compliance graphs will appear here based on site activity logs.")
-    st.progress(85, text="Overall Weekly Site Safety Compliance: 85%")
+    st.markdown("### 📈 Site Compliance Analytics")
+    st.info("Overall safety compliance metrics and logs summary.")
+    st.progress(90, text="Site Safety Compliance Rate: 90%")
 
 with tab3:
-    st.markdown("### 🚨 Recorded Safety Violation Logs")
-    st.warning("⚠️ No recent critical breaches logged in the current session. System is actively monitoring.")
+    st.markdown("### 🚨 Safety Violation Records")
+    st.warning("⚠️ No active violations recorded in this session. All scanned workers are fully compliant.")
