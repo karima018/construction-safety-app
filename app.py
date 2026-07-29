@@ -6,6 +6,7 @@ from datetime import datetime
 import gdown
 import os
 import io
+import pandas as pd
 
 # --- Google Drive Configuration ---
 FILE_ID = "1qM0-5Ca55hyuGTtuAafxqtlbw0Z97-5p"
@@ -34,6 +35,14 @@ except Exception as e:
 
 # --- Page Configuration ---
 st.set_page_config(page_title="Construction Safety Dashboard", page_icon="🛡️", layout="wide")
+
+# --- Initialize Session State for Logs & Analytics ---
+if 'total_scans' not in st.session_state:
+    st.session_state.total_scans = 0
+if 'compliant_scans' not in st.session_state:
+    st.session_state.compliant_scans = 0
+if 'violation_records' not in st.session_state:
+    st.session_state.violation_records = []
 
 # --- Custom CSS Styling (Dark Theme & Modern Cards) ---
 st.markdown("""
@@ -64,7 +73,7 @@ col_h1, col_h2, col_h3 = st.columns([2, 5, 2])
 with col_h1:
     st.markdown("### 🛡️ Safety Dashboard")
 with col_h2:
-    st.markdown("<p style='text-align: center; color: #94a3b8; font-size: 14px;'>Real-time PPE Detection & Access Control System</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #94a3b8; font-size: 14px;'>SmartConnect Corporate Infrastructure</p>", unsafe_allow_html=True)
 with col_h3:
     current_time = datetime.now().strftime("%I:%M:%S %p")
     st.markdown(f"<p style='text-align: right; color: #38bdf8; font-size: 14px;'>🕒 <b>{current_time}</b></p>", unsafe_allow_html=True)
@@ -76,10 +85,53 @@ st.sidebar.markdown("### 🎛️ Control Panel")
 app_mode = st.sidebar.selectbox("Choose Input Mode", ["📁 Upload Image", "📷 Webcam Live Photo"])
 confidence = st.sidebar.slider("Confidence Threshold", 0.1, 1.0, 0.4, 0.05)
 st.sidebar.markdown("---")
-st.sidebar.info("💡 **Tip:** Adjust the confidence slider if items are not detected properly.")
+st.sidebar.info("💡 **Tip:** Upload a worker image or take a snapshot to automatically update Analytics and Violation logs.")
 
-# --- Tab Navigation (Updated for Construction Safety) ---
+# --- Tab Navigation ---
 tab1, tab2, tab3 = st.tabs(["📸 Upload & Snapshot", "📊 Site Analytics", "🚨 Violation Records"])
+
+def process_detection(image, source_name="Uploaded Image"):
+    global st
+    with st.spinner("Analyzing site safety components..."):
+        results = model(image, conf=confidence)
+        res_plotted = results[0].plot()
+        res_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
+        
+        boxes = results[0].boxes
+        class_names = results[0].names
+        detected_classes = [class_names[int(cls)] for cls in boxes.cls]
+        
+        helmet_count = detected_classes.count('helmet')
+        vest_count = detected_classes.count('vest')
+        has_helmet = 'helmet' in detected_classes
+        has_vest = 'vest' in detected_classes
+        
+        # Update Session Stats
+        st.session_state.total_scans += 1
+        scan_time = datetime.now().strftime("%I:%M:%S %p - %Y-%m-%d")
+        
+        if has_helmet and has_vest:
+            st.session_state.compliant_scans += 1
+            status = "ALLOWED ✅"
+            missing = "None (Fully Compliant)"
+        else:
+            status = "ACCESS DENIED ❌"
+            missing_items = []
+            if not has_helmet: missing_items.append("Helmet")
+            if not has_vest: missing_items.append("Safety Vest")
+            missing = ", ".join(missing_items)
+            
+            # Log Violation
+            st.session_state.violation_records.insert(0, {
+                "Time": scan_time,
+                "Source": source_name,
+                "Status": status,
+                "Missing Gear": missing,
+                "Helmets Count": helmet_count,
+                "Vests Count": vest_count
+            })
+            
+        return res_rgb, helmet_count, vest_count, len(detected_classes), has_helmet, has_vest
 
 with tab1:
     if app_mode == "📁 Upload Image" and model_status:
@@ -97,38 +149,26 @@ with tab1:
                     st.image(original_image, use_container_width=True)
                     
                 if st.button("🚀 Run Safety Analysis", use_container_width=True):
-                    with st.spinner("Analyzing site safety components..."):
-                        results = model(original_image, conf=confidence)
-                        res_plotted = results[0].plot()
-                        res_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
-                        
-                        with col2:
-                            st.markdown("##### 🔍 AI Detection Output")
-                            st.image(res_rgb, use_container_width=True)
-                        
-                        boxes = results[0].boxes
-                        class_names = results[0].names
-                        detected_classes = [class_names[int(cls)] for cls in boxes.cls]
-                        
-                        helmet_count = detected_classes.count('helmet')
-                        vest_count = detected_classes.count('vest')
-                        has_helmet = 'helmet' in detected_classes
-                        has_vest = 'vest' in detected_classes
-                        
-                        st.markdown("### 📊 Detection Statistics")
-                        m1, m2, m3 = st.columns(3)
-                        with m1: st.metric(label="👷 Helmets Detected", value=helmet_count)
-                        with m2: st.metric(label="🦺 Safety Vests Detected", value=vest_count)
-                        with m3: st.metric(label="📌 Total Detections", value=len(detected_classes))
+                    res_rgb, h_count, v_count, total_det, h_status, v_status = process_detection(original_image, "Uploaded Image")
+                    
+                    with col2:
+                        st.markdown("##### 🔍 AI Detection Output")
+                        st.image(res_rgb, use_container_width=True)
+                    
+                    st.markdown("### 📊 Current Scan Statistics")
+                    m1, m2, m3 = st.columns(3)
+                    with m1: st.metric(label="👷 Helmets Detected", value=h_count)
+                    with m2: st.metric(label="🦺 Safety Vests Detected", value=v_count)
+                    with m3: st.metric(label="📌 Total Detections", value=total_det)
 
-                        st.markdown("### 🚦 Access Control Gate Status")
-                        if has_helmet and has_vest:
-                            st.success("✅ **ACCESS GRANTED (ALLOWED)** — Worker is wearing complete safety gear.")
-                        else:
-                            violation_text = []
-                            if not has_helmet: violation_text.append("Helmet")
-                            if not has_vest: violation_text.append("Safety Vest")
-                            st.error(f"❌ **ACCESS DENIED** — Missing: {', '.join(violation_text)}.")
+                    st.markdown("### 🚦 Access Control Gate Status")
+                    if h_status and v_status:
+                        st.success("✅ **ACCESS GRANTED (ALLOWED)** — Worker is wearing complete safety gear.")
+                    else:
+                        violation_text = []
+                        if not h_status: violation_text.append("Helmet")
+                        if not v_status: violation_text.append("Safety Vest")
+                        st.error(f"❌ **ACCESS DENIED** — Missing: {', '.join(violation_text)}.")
             except Exception as e:
                 st.error(f"Error processing image: {e}")
 
@@ -138,38 +178,53 @@ with tab1:
         
         if camera_file is not None:
             image = Image.open(camera_file)
-            results = model(image, conf=confidence)
-            res_plotted = results[0].plot()
-            res_rgb = cv2.cvtColor(res_plotted, cv2.COLOR_BGR2RGB)
+            res_rgb, h_count, v_count, total_det, h_status, v_status = process_detection(image, "Webcam Snapshot")
             
             st.image(res_rgb, caption="Live Processed Frame", use_container_width=True)
             
-            boxes = results[0].boxes
-            class_names = results[0].names
-            detected_classes = [class_names[int(cls)] for cls in boxes.cls]
-            
-            helmet_count = detected_classes.count('helmet')
-            vest_count = detected_classes.count('vest')
-            
             m1, m2, m3 = st.columns(3)
-            with m1: st.metric(label="👷 Helmets", value=helmet_count)
-            with m2: st.metric(label="🦺 Vests", value=vest_count)
-            with m3: st.metric(label="📌 Total", value=len(detected_classes))
-            
-            has_helmet = 'helmet' in detected_classes
-            has_vest = 'vest' in detected_classes
+            with m1: st.metric(label="👷 Helmets", value=h_count)
+            with m2: st.metric(label="🦺 Vests", value=v_count)
+            with m3: st.metric(label="📌 Total", value=total_det)
             
             st.markdown("### 🚦 Access Control Gate Status")
-            if has_helmet and has_vest:
+            if h_status and v_status:
                 st.success("✅ **STATUS: ALLOWED TO ENTER** — Complete gear verified.")
             else:
                 st.error("❌ **STATUS: ACCESS DENIED** — Missing safety equipment!")
 
 with tab2:
     st.markdown("### 📈 Site Compliance Analytics")
-    st.info("Overall safety compliance metrics and logs summary.")
-    st.progress(90, text="Site Safety Compliance Rate: 90%")
+    
+    total = st.session_state.total_scans
+    compliant = st.session_state.compliant_scans
+    compliance_rate = int((compliant / total) * 100) if total > 0 else 100
+    
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        st.metric(label="Total Scans Performed", value=total)
+    with col_b:
+        st.metric(label="Compliant Entry Passes", value=compliant)
+    with col_c:
+        st.metric(label="Total Violations Logged", value=len(st.session_state.violation_records))
+        
+    st.markdown("---")
+    st.markdown(f"#### Overall Site Compliance Rate: **{compliance_rate}%**")
+    st.progress(compliance_rate / 100.0)
+    
+    if total == 0:
+        st.info("ℹ️ No scans recorded yet. Upload an image or take a webcam snapshot in the first tab to generate analytics data.")
 
 with tab3:
     st.markdown("### 🚨 Safety Violation Records")
-    st.warning("⚠️ No active violations recorded in this session. All scanned workers are fully compliant.")
+    
+    if len(st.session_state.violation_records) > 0:
+        st.warning(f"⚠️ Total {len(st.session_state.violation_records)} safety breach(es) detected across recent scans.")
+        df_violations = pd.DataFrame(st.session_state.violation_records)
+        st.dataframe(df_violations, use_container_width=True)
+        
+        if st.button("🗑️ Clear Violation Logs"):
+            st.session_state.violation_records = []
+            st.rerun()
+    else:
+        st.success("✅ No safety violations recorded yet! All scanned workers are fully compliant.")
